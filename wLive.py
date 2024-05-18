@@ -5,7 +5,7 @@ import numpy as np
 
 data = {
     "images": ["image/path"],
-    "ids": ["Zanlı"]
+    "ids": ["Suspect"]
 }
 
 known_face_encodings = []
