@@ -1,82 +1,106 @@
-# src/face_recognition_app.py
+# face_utils.py
 
-import streamlit as st
-import cv2
+import os
 import face_recognition
+import cv2
 import numpy as np
-from PIL import Image
-from face_utils import load_known_faces, draw_fancy_box
+import logging
 
-# Load known faces (adjust paths as needed)
-data = {
-    "images": ["assets/sample_face.jpg"],  # Replace with actual paths
-    "ids": ["Suspect"]
-}
+def load_known_faces(data=None, directory=None, verbose=False):
+    """
+    Load known face encodings from given paths and IDs or from a directory.
 
-known_face_encodings, known_face_ids = load_known_faces(data)
+    Args:
+        data (dict): Dictionary with image paths and associated IDs.
+        directory (str): Directory containing images of known faces.
+        verbose (bool): If True, prints processing information for each face.
 
-# Streamlit Interface Elements
-st.title("Face Recognition System")
-st.sidebar.title("Configuration")
-st.sidebar.subheader("Video Settings")
+    Returns:
+        list: A list of known face encodings.
+        list: A list of known face IDs.
+    """
+    known_face_encodings = []
+    known_face_ids = []
 
-video_source = st.sidebar.selectbox("Select Video Source", options=["Webcam", "Upload Video"])
-show_fancy_box = st.sidebar.checkbox("Show Fancy Box", value=True)
+    # Option 1: Load faces from provided `data` dictionary.
+    if data:
+        for image_path, face_id in zip(data["images"], data["ids"]):
+            try:
+                image = face_recognition.load_image_file(image_path)
+                face_encodings = face_recognition.face_encodings(image, num_jitters=10, model='large')
+                
+                if face_encodings:  # If at least one face is found
+                    known_face_encodings.append(face_encodings[0])
+                    known_face_ids.append(face_id)
+                    if verbose:
+                        print(f"Loaded encoding for {face_id} from {image_path}")
+                else:
+                    logging.warning(f"No faces found in image: {image_path}")
+            except Exception as e:
+                logging.error(f"Error processing image {image_path}: {e}")
+    # Option 2: Load faces from a directory, where image file name is the ID.
+    elif directory:
+        for filename in os.listdir(directory):
+            file_path = os.path.join(directory, filename)
+            if not filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+                continue  # Skip non-image files
+            
+            face_id = os.path.splitext(filename)[0]  # Use file name as ID
+            try:
+                image = face_recognition.load_image_file(file_path)
+                face_encodings = face_recognition.face_encodings(image, num_jitters=10, model='large')
 
-# Upload video option (for demonstration or testing)
-uploaded_file = None
-if video_source == "Upload Video":
-    uploaded_file = st.sidebar.file_uploader("Upload a video file", type=["mp4", "avi", "mov"])
-
-# Start the video feed if the user selects webcam or uploads a video
-run = st.button("Start Face Recognition")
-
-if run:
-    stframe = st.empty()  # Placeholder for displaying video frames
-
-    # Initialize video capture
-    if video_source == "Webcam":
-        video_capture = cv2.VideoCapture(0)  # Use webcam
+                if face_encodings:
+                    known_face_encodings.append(face_encodings[0])
+                    known_face_ids.append(face_id)
+                    if verbose:
+                        print(f"Loaded encoding for {face_id} from {file_path}")
+                else:
+                    logging.warning(f"No faces found in image: {file_path}")
+            except Exception as e:
+                logging.error(f"Error processing image {file_path}: {e}")
     else:
-        video_capture = cv2.VideoCapture(uploaded_file.name)  # Use uploaded file path
+        logging.error("Either 'data' or 'directory' must be provided to load known faces.")
 
-    while True:
-        ret, frame = video_capture.read()
-        if not ret:
-            break
+    return known_face_encodings, known_face_ids
 
-        # Resize frame for faster processing
-        small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
-        rgb_small_frame = small_frame[:, :, ::-1]
 
-        # Detect faces
-        faces = face_recognition.face_locations(rgb_small_frame)
-        face_encodings = face_recognition.face_encodings(rgb_small_frame, faces)
+def draw_fancy_box(frame, top, right, bottom, left, color=(0, 255, 0), thickness=2, style='fancy', label=None):
+    """
+    Draw a fancy box around the detected face, with optional label.
 
-        for (top, right, bottom, left), face_encoding in zip(faces, face_encodings):
-            matches = face_recognition.compare_faces(known_face_encodings, face_encoding)
-            face_id = "Unknown"
-            face_confidence = 0.0
+    Args:
+        frame (numpy.ndarray): The image frame to draw on.
+        top (int): Top y-coordinate of the box.
+        right (int): Right x-coordinate of the box.
+        bottom (int): Bottom y-coordinate of the box.
+        left (int): Left x-coordinate of the box.
+        color (tuple): Color of the box (B, G, R).
+        thickness (int): Thickness of the box lines.
+        style (str): Style of the box ('fancy' or 'simple').
+        label (str): Optional label text to display near the box.
 
-            face_distances = face_recognition.face_distance(known_face_encodings, face_encoding)
-            best_match_index = np.argmin(face_distances)
+    Returns:
+        numpy.ndarray: The modified frame with drawn box and label.
+    """
+    if style == 'fancy':
+        # Draw corner lines to create a fancy box
+        length = 30  # Length of the decorative corners
+        cv2.line(frame, (left, top), (left + length, top), color, thickness)
+        cv2.line(frame, (left, top), (left, top + length), color, thickness)
+        cv2.line(frame, (right, top), (right - length, top), color, thickness)
+        cv2.line(frame, (right, top), (right, top + length), color, thickness)
+        cv2.line(frame, (left, bottom), (left + length, bottom), color, thickness)
+        cv2.line(frame, (left, bottom), (left, bottom - length), color, thickness)
+        cv2.line(frame, (right, bottom), (right - length, bottom), color, thickness)
+        cv2.line(frame, (right, bottom), (right, bottom - length), color, thickness)
+    else:
+        # Draw a simple rectangle
+        cv2.rectangle(frame, (left, top), (right, bottom), color, thickness)
 
-            if matches[best_match_index]:
-                face_id = known_face_ids[best_match_index]
-                face_confidence = 1 - face_distances[best_match_index]
+    # Optional: Draw the label near the face box
+    if label:
+        label_position = (left, top - 15 if top - 15 > 15 else top + 15)
+        cv2.putText(frame, label, label_position, cv2.FONT_HERSHEY_SIMPLEX, 0.75, color, 2)
 
-            # Draw fancy box and display name if enabled
-            if show_fancy_box:
-                frame = draw_fancy_box(frame, top * 4, right * 4, bottom * 4, left * 4)
-            cv2.putText(frame, f"{face_id} ({face_confidence:.2f})", (left * 4, top * 4 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-
-        # Display frame in Streamlit
-        stframe.image(frame, channels="BGR")
-
-        if st.sidebar.button("Stop"):
-            break
-
-    # Release video capture and close Streamlit app
-    video_capture.release()
-    cv2.destroyAllWindows()
+    return frame
