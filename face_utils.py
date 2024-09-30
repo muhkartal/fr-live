@@ -5,6 +5,7 @@ import face_recognition
 import cv2
 import numpy as np
 import logging
+import pickle
 
 def load_known_faces(data=None, directory=None, verbose=False):
     """
@@ -63,6 +64,35 @@ def load_known_faces(data=None, directory=None, verbose=False):
         logging.error("Either 'data' or 'directory' must be provided to load known faces.")
 
     return known_face_encodings, known_face_ids
+
+
+
+def save_new_face(face_id, face_encoding, encoding_file="face_encodings.pkl"):
+    """
+    Save a new face encoding and ID to a file.
+    
+    Args:
+        face_id (str): The ID or name of the person.
+        face_encoding (np.ndarray): The face encoding to save.
+        encoding_file (str): Path to the file where encodings are saved.
+    """
+    if os.path.exists(encoding_file):
+        with open(encoding_file, "rb") as file:
+            data = pickle.load(file)
+            known_face_ids = data["ids"]
+            known_face_encodings = data["encodings"]
+    else:
+        known_face_ids = []
+        known_face_encodings = []
+
+    known_face_ids.append(face_id)
+    known_face_encodings.append(face_encoding)
+
+    with open(encoding_file, "wb") as file:
+        pickle.dump({"ids": known_face_ids, "encodings": known_face_encodings}, file)
+
+    print(f"Registered new face: {face_id}")
+
 
 
 def draw_fancy_box(frame, top, right, bottom, left, color=(0, 255, 0), thickness=2, style='fancy', label=None):
