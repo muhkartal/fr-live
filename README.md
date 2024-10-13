@@ -11,10 +11,8 @@ The script captures video from your webcam, detects faces, compares them with kn
 * Confidence Score: Displays a confidence score for the recognized faces.
 
 Prerequisites
-⚹Python 3.x
-⚹OpenCV
-⚹face_recognition
-⚹numpy
+⚹Python 3.x ⚹OpenCV ⚹face_recognition ⚹numpy
+
 
 You can install the required packages using pip:
 
